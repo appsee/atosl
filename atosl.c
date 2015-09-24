@@ -1103,7 +1103,9 @@ int print_dwarf_symbol(Dwarf_Debug dbg, Dwarf_Addr slide, Dwarf_Addr addr)
         }
     }
 
-    dwarf_dealloc(dbg, arange, DW_DLA_ARANGE);
+    // Deallocating arange commented out because it causes segmentation fault when symbolicating multiple addresses
+    // Test case: ./atosl -c -o /home/ec2-user/Swift2 -A arm64 -l 0x100040000 0x100084090 0x100085108 0x10008d9f4
+    //dwarf_dealloc(dbg, arange, DW_DLA_ARANGE);
     dwarf_srclines_dealloc(dbg, linebuf, linecount);
 
     return found ? DW_DLV_OK : DW_DLV_NO_ENTRY;
