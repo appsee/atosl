@@ -214,12 +214,11 @@ static void handle_die(
 
     do {
         *subprograms = read_cu_entry(*subprograms, dbg, cu_die, current_die, language);
-
         /* Recursive call handle_die with child, to continue searching within child dies */
         rc = dwarf_child(current_die, &child_die, &err);
         DWARF_ASSERT(rc, err);
         if (rc == DW_DLV_OK && child_die)
-            handle_die(subprograms, dbg, cu_die, child_die, language);    
+            handle_die(subprograms, dbg, cu_die, child_die, language);
 
         rc = dwarf_siblingof(dbg, current_die, &next_die, &err);
         DWARF_ASSERT(rc, err);
@@ -335,12 +334,15 @@ struct dwarf_subprogram_t *read_from_globals(Dwarf_Debug dbg)
     Dwarf_Addr lowpc = 0;
     Dwarf_Addr highpc = 0;
     Dwarf_Error err;
-    Dwarf_Attribute attrib = 0;
+    //Dwarf_Attribute attrib = 0; // (Appsee modification, see below)
     struct dwarf_subprogram_t *subprograms = NULL;
     struct dwarf_subprogram_t *subprogram = NULL;
     char *name;
     int i;
     int ret;
+    Dwarf_Unsigned language = 0;
+    Dwarf_Attribute language_attr = 0;
+    char* die_name = 0;
 
     ret = dwarf_get_globals(dbg, &globals, &nglobals, &err);
     DWARF_ASSERT(ret, err);
@@ -371,16 +373,41 @@ struct dwarf_subprogram_t *read_from_globals(Dwarf_Debug dbg)
                 fatal("unable to allocate memory for subprogram");
             memset(subprogram, 0, sizeof(*subprogram));
 
-            ret = dwarf_attr(die, DW_AT_MIPS_linkage_name, &attrib, &err);
-            if (ret == DW_DLV_OK) {
-                ret = dwarf_formstring(attrib, &name, &err);
-                DWARF_ASSERT(ret, err);
+            ///////////////////////////////
+            // Appsee modification:
+            // Make sure subprogram->name returned from "read_from_globals" will be the same one as "read_cu_entry"
+            ///////////////////////////////
+            // ret = dwarf_attr(die, DW_AT_MIPS_linkage_name, &attrib, &err);
+            // if (ret == DW_DLV_OK) {
+            //     ret = dwarf_formstring(attrib, &name, &err);
+            //     DWARF_ASSERT(ret, err);
+            //     dwarf_dealloc(dbg, attrib, DW_DLA_ATTR);
+            // } else {
+            //     ret = dwarf_globname(globals[i], &name, &err);
+            //     DWARF_ASSERT(ret, err);
+            // }
 
-                dwarf_dealloc(dbg, attrib, DW_DLA_ATTR);
-            } else {
-                ret = dwarf_globname(globals[i], &name, &err);
+            /* Get compilation unit language attribute */
+            ret = dwarf_attr(die, DW_AT_language, &language_attr, &err);
+            DWARF_ASSERT(ret, err);
+            if (ret != DW_DLV_NO_ENTRY) {
+                /* Get language attribute data */
+                ret = dwarf_formudata(language_attr, &language, &err);
                 DWARF_ASSERT(ret, err);
+                dwarf_dealloc(dbg, language_attr, DW_DLA_ATTR);
             }
+
+            ret = dwarf_diename(die, &die_name, &err);
+            DWARF_ASSERT(ret, err);
+
+            name = die_name;
+
+            /* Concatenate function params in case this is Swift */
+            if (language == DW_LANG_Swift)
+                name = get_function_name_with_params(die_name, die, dbg);
+
+            // End of Appsee modification
+            ///////////////////////////////
 
             subprogram->lowpc = lowpc;
             subprogram->highpc = highpc;
