@@ -53,7 +53,7 @@ static char* get_function_name_with_params(char *die_name, Dwarf_Die the_die, Dw
 {
     int rc;
     Dwarf_Error err;
-    
+
     /* Allocate symbol name string buffer */
     int symbol_name_buffer_length = (strlen(die_name) + 2) * 32; /* Buffer size */
     char *symbol_name = malloc(symbol_name_buffer_length);
@@ -64,13 +64,13 @@ static char* get_function_name_with_params(char *die_name, Dwarf_Die the_die, Dw
     strcpy(symbol_name, die_name);
     strcat(symbol_name, " (");
     int symbol_name_length = strlen(symbol_name); /* Actual string length */
-    
+
     /* Get subprogram children */
     Dwarf_Die child_die = NULL;
     Dwarf_Die next_die;
     rc = dwarf_child(the_die, &child_die, &err);
     DWARF_ASSERT(rc, err);
-    
+
     if (rc == DW_DLV_OK && child_die){
         do {
             /* Get child tag */
@@ -82,18 +82,18 @@ static char* get_function_name_with_params(char *die_name, Dwarf_Die the_die, Dw
             /* Check if child is a parameter */
             if (child_tag == DW_TAG_formal_parameter) {
                 char* param_name = 0;
-                
+
                 /* Get param name (child die name), ignoring the "self" parameter */
                 rc = dwarf_diename(child_die, &param_name, &err);
                 if (rc == DW_DLV_OK && strcmp(param_name, "self") != 0) {
-                    
+                
                     /* Update actual symbol name string length */
                     symbol_name_length += strlen(param_name) + 2;
                     
                     /* Check if symbol name string buffer needs expansion */
                     if (symbol_name_length >= symbol_name_buffer_length - 1)
                         
-                    /* Expand (reallocate) symbol name string buffer */
+                        /* Expand (reallocate) symbol name string buffer */
                         symbol_name = realloc(symbol_name, symbol_name_buffer_length *= 2);
                     
                     /* Concatenate param name and ", " */
@@ -101,7 +101,7 @@ static char* get_function_name_with_params(char *die_name, Dwarf_Die the_die, Dw
                     strcat(symbol_name, ", ");
                 }
             }
-            
+
             /* Move to next sibling (param) */
             rc = dwarf_siblingof(dbg, child_die, &next_die, &err);
             DWARF_ASSERT(rc, err);
@@ -110,7 +110,7 @@ static char* get_function_name_with_params(char *die_name, Dwarf_Die the_die, Dw
             child_die = next_die;
         } while (rc != DW_DLV_NO_ENTRY);
     }
-    
+
     /* Remove trailing ", " if needed */
     int len = strlen(symbol_name);
     if (symbol_name[len - 1] == ' ') {
@@ -119,7 +119,7 @@ static char* get_function_name_with_params(char *die_name, Dwarf_Die the_die, Dw
     }
     
     strcat (symbol_name, ")");
-    
+
     return symbol_name;
 }
 
@@ -131,10 +131,10 @@ static char* get_function_name_with_params(char *die_name, Dwarf_Die the_die, Dw
  * switch to cache_globals if we fix that */
 
 /* List a function if it's in the given DIE.
- */
+*/
 static struct dwarf_subprogram_t *read_cu_entry(
-                                                struct dwarf_subprogram_t *subprograms,
-                                                Dwarf_Debug dbg, Dwarf_Die cu_die, Dwarf_Die the_die, Dwarf_Unsigned language)
+        struct dwarf_subprogram_t *subprograms,
+        Dwarf_Debug dbg, Dwarf_Die cu_die, Dwarf_Die the_die, Dwarf_Unsigned language)
 {
     char* die_name = 0;
     Dwarf_Error err;
@@ -145,47 +145,47 @@ static struct dwarf_subprogram_t *read_cu_entry(
     struct dwarf_subprogram_t *subprogram = NULL;
     int rc;
     Dwarf_Attribute attrib = 0;
-    
+
     rc = dwarf_tag(the_die, &tag, &err);
     if (rc != DW_DLV_OK)
         fatal("unable to parse dwarf tag");
-    
+
     /* Only interested in subprogram DIEs here */
     if (tag != DW_TAG_subprogram)
         return subprograms;
-    
+
     rc = dwarf_diename(the_die, &die_name, &err);
     if (rc == DW_DLV_ERROR)
         fatal("unable to parse dwarf diename");
-    
+
     if (rc == DW_DLV_NO_ENTRY)
         return subprograms;
-    
+
     rc = dwarf_attr(cu_die, DW_AT_name, &attrib, &err);
     DWARF_ASSERT(rc, err);
-    
+
     if (rc != DW_DLV_NO_ENTRY) {
         rc = dwarf_formstring(attrib, &filename, &err);
         DWARF_ASSERT(rc, err);
-        
+
         dwarf_dealloc(dbg, attrib, DW_DLA_ATTR);
     }
-    
+
     rc = dwarf_lowpc(the_die, &lowpc, &err);
     DWARF_ASSERT(rc, err);
-    
+
     rc = dwarf_highpc(the_die, &highpc, &err);
     DWARF_ASSERT(rc, err);
-    
+
     /* TODO: when would these not be defined? */
     if (lowpc && highpc) {
         subprogram = malloc(sizeof(*subprogram));
         if (!subprogram)
             fatal("unable to allocate memory");
         memset(subprogram, 0, sizeof(*subprogram));
-        
+
         char* symbol_name = die_name;
-        
+
         /* Concatenate function params in case this is Swift */
         if (language == DW_LANG_Swift)
             symbol_name = get_function_name_with_params(die_name, the_die, dbg);
@@ -193,25 +193,25 @@ static struct dwarf_subprogram_t *read_cu_entry(
         subprogram->lowpc = lowpc;
         subprogram->highpc = highpc;
         subprogram->name = symbol_name;
-        
+
         subprogram->next = subprograms;
         subprograms = subprogram;
     }
-    
+
     return subprograms;
 }
 
 
 static void handle_die(
-                       struct dwarf_subprogram_t **subprograms,
-                       Dwarf_Debug dbg, Dwarf_Die cu_die, Dwarf_Die the_die, Dwarf_Unsigned language)
+        struct dwarf_subprogram_t **subprograms,
+        Dwarf_Debug dbg, Dwarf_Die cu_die, Dwarf_Die the_die, Dwarf_Unsigned language)
 {
     int rc;
     Dwarf_Error err;
     Dwarf_Die current_die = the_die;
     Dwarf_Die child_die = NULL;
     Dwarf_Die next_die;
-    
+
     do {
         *subprograms = read_cu_entry(*subprograms, dbg, cu_die, current_die, language);
         /* Recursive call handle_die with child, to continue searching within child dies */
@@ -219,12 +219,12 @@ static void handle_die(
         DWARF_ASSERT(rc, err);
         if (rc == DW_DLV_OK && child_die)
             handle_die(subprograms, dbg, cu_die, child_die, language);
-        
+
         rc = dwarf_siblingof(dbg, current_die, &next_die, &err);
         DWARF_ASSERT(rc, err);
-        
+
         dwarf_dealloc(dbg, current_die, DW_DLA_DIE);
-        
+
         current_die = next_die;
     } while (rc != DW_DLV_NO_ENTRY);
 }
@@ -239,24 +239,24 @@ static struct dwarf_subprogram_t *read_from_cus(Dwarf_Debug dbg)
     struct dwarf_subprogram_t *subprograms = NULL;
     Dwarf_Unsigned language = 0;
     Dwarf_Attribute language_attr = 0;
-    
+
     while (ret == DW_DLV_OK) {
         ret = dwarf_next_cu_header(
-                                   dbg,
-                                   &cu_header_length,
-                                   &version_stamp,
-                                   &abbrev_offset,
-                                   &address_size,
-                                   &next_cu_header,
-                                   &err);
+                dbg,
+                &cu_header_length,
+                &version_stamp,
+                &abbrev_offset,
+                &address_size,
+                &next_cu_header,
+                &err);
         DWARF_ASSERT(ret, err);
-        
+
         if (ret == DW_DLV_NO_ENTRY)
             continue;
-        
+
         /* TODO: If the CU can provide an address range then we can skip over
          * all the entire die if none of our addresses match */
-        
+
         /* Expect the CU to have a single sibling - a DIE */
         ret = dwarf_siblingof(dbg, no_die, &cu_die, &err);
         /* If there's either an error in obtaining the die, or no entry exits for the current CU, continue */
@@ -264,7 +264,7 @@ static struct dwarf_subprogram_t *read_from_cus(Dwarf_Debug dbg)
             continue;
         }
         DWARF_ASSERT(ret, err);
-        
+
         /* Get compilation unit language attribute */
         ret = dwarf_attr(cu_die, DW_AT_language, &language_attr, &err);
         DWARF_ASSERT(ret, err);
@@ -274,16 +274,16 @@ static struct dwarf_subprogram_t *read_from_cus(Dwarf_Debug dbg)
             DWARF_ASSERT(ret, err);
             dwarf_dealloc(dbg, language_attr, DW_DLA_ATTR);
         }
-        
+
         /* Expect the CU DIE to have children */
         ret = dwarf_child(cu_die, &child_die, &err);
         DWARF_ASSERT(ret, err);
-        
-        handle_die(&subprograms, dbg, cu_die, child_die, language);
-        
+
+        handle_die(&subprograms, dbg, cu_die, child_die, language);  
+
         dwarf_dealloc(dbg, cu_die, DW_DLA_DIE);
     }
-    
+
     return subprograms;
 }
 
@@ -292,35 +292,35 @@ static char *get_cache_filename(struct subprograms_options_t *options,
 {
     int i;
     int max_dirlen  =
-    MAX(strlen(getenv("HOME")) + strlen("/") + strlen(SUBPROGRAMS_CACHE_PATH),
-        options->cache_dir ? strlen(options->cache_dir) : 0);
+        MAX(strlen(getenv("HOME")) + strlen("/") + strlen(SUBPROGRAMS_CACHE_PATH),
+            options->cache_dir ? strlen(options->cache_dir) : 0);
     size_t filename_len =
-    max_dirlen + strlen("/") + (UUID_LEN * sizeof(char) * 2) + 1;
-    
+        max_dirlen + strlen("/") + (UUID_LEN * sizeof(char) * 2) + 1;
+
     char *filename = malloc(sizeof(char) * filename_len);
     memset(filename, 0, filename_len);
-    
+
     /* First generate the directory */
     if (options->cache_dir)
         sprintf(filename, "%s/", options->cache_dir);
     else
         sprintf(filename, "%s/" SUBPROGRAMS_CACHE_PATH, getenv("HOME"));
-    
+
     if (access(filename, F_OK) != 0) {
         if (errno == ENOENT) {
             int ret = mkdir(filename, 0777);
-            
+
             if (ret < 0)
                 fatal("unable to create %s: %s", filename, strerror(errno));
         }
     }
-    
+
     /* Then add the filename (ascii version of uuid) */
     filename = strcat(filename, "/");
     char *p = filename + strlen(filename);
     for (i = 0; i < UUID_LEN; i++)
         p += sprintf(p, "%.02x", uuid[i]);
-    
+
     return filename;
 }
 
@@ -334,7 +334,7 @@ struct dwarf_subprogram_t *read_from_globals(Dwarf_Debug dbg)
     Dwarf_Addr lowpc = 0;
     Dwarf_Addr highpc = 0;
     Dwarf_Error err;
-    //Dwarf_Attribute attrib = 0; // (Appsee modification, see below)
+    Dwarf_Attribute attrib = 0;
     struct dwarf_subprogram_t *subprograms = NULL;
     struct dwarf_subprogram_t *subprogram = NULL;
     char *name;
@@ -343,36 +343,36 @@ struct dwarf_subprogram_t *read_from_globals(Dwarf_Debug dbg)
     Dwarf_Unsigned language = 0;
     Dwarf_Attribute language_attr = 0;
     char* die_name = 0;
-    
+
     ret = dwarf_get_globals(dbg, &globals, &nglobals, &err);
     DWARF_ASSERT(ret, err);
-    
+
     if (ret != DW_DLV_OK)
         fatal("unable to get dwarf globals");
-    
+
     for (i = 0; i < nglobals; i++) {
         ret = dwarf_global_name_offsets(globals[i], &name, &die_off, &cu_off, &err);
         DWARF_ASSERT(ret, err);
-        
+
         /* TODO: this function does a linear search, making it pretty damn
          * slow.. see libdwarf/dwarf_die_deliv.c:_dwarf_find_CU_Context
          * for details */
         ret = dwarf_offdie(dbg, die_off, &die, &err);
         DWARF_ASSERT(ret, err);
-        
+
         ret = dwarf_lowpc(die, &lowpc, &err);
         DWARF_ASSERT(ret, err);
-        
+
         ret = dwarf_highpc(die, &highpc, &err);
         DWARF_ASSERT(ret, err);
-        
+
         /* TODO: when would these not be defined? */
         if (lowpc && highpc) {
             subprogram = malloc(sizeof(*subprogram));
             if (!subprogram)
                 fatal("unable to allocate memory for subprogram");
             memset(subprogram, 0, sizeof(*subprogram));
-            
+
             ///////////////////////////////
             // Appsee modification:
             // Make sure subprogram->name returned from "read_from_globals" will be the same one as "read_cu_entry"
@@ -386,10 +386,10 @@ struct dwarf_subprogram_t *read_from_globals(Dwarf_Debug dbg)
             //     ret = dwarf_globname(globals[i], &name, &err);
             //     DWARF_ASSERT(ret, err);
             // }
-            
+
             ret = dwarf_offdie(dbg, cu_off, &cu_die, &err);
             DWARF_ASSERT(ret, err);
-            
+
             /* Get compilation unit language attribute */
             ret = dwarf_attr(cu_die, DW_AT_language, &language_attr, &err);
             DWARF_ASSERT(ret, err);
@@ -399,30 +399,43 @@ struct dwarf_subprogram_t *read_from_globals(Dwarf_Debug dbg)
                 DWARF_ASSERT(ret, err);
                 dwarf_dealloc(dbg, language_attr, DW_DLA_ATTR);
             }
-            
+
             ret = dwarf_diename(die, &die_name, &err);
             DWARF_ASSERT(ret, err);
-            
+
             name = die_name;
-            
+
             /* Concatenate function params in case this is Swift */
-            if (language == DW_LANG_Swift)
+            if (language == DW_LANG_Swift && die_name)
                 name = get_function_name_with_params(die_name, die, dbg);
-            
+
+            /* if name is null set the name as it was before Appsee modification */
+            if (!name) {
+                ret = dwarf_attr(die, DW_AT_MIPS_linkage_name, &attrib, &err);
+                if (ret == DW_DLV_OK) {
+                    ret = dwarf_formstring(attrib, &name, &err);
+                    DWARF_ASSERT(ret, err);
+                    dwarf_dealloc(dbg, attrib, DW_DLA_ATTR);
+                } else {
+                    ret = dwarf_globname(globals[i], &name, &err);
+                    DWARF_ASSERT(ret, err);
+                }
+            }
+
             // End of Appsee modification
             ///////////////////////////////
-            
+
             subprogram->lowpc = lowpc;
             subprogram->highpc = highpc;
             subprogram->name = name;
-            
+
             subprogram->next = subprograms;
             subprograms = subprogram;
         }
-        
+
         dwarf_dealloc(dbg, die, DW_DLA_DIE);
     }
-    
+
     return subprograms;
 }
 
@@ -435,33 +448,33 @@ static struct dwarf_subprogram_t *load_subprograms(const char *filename)
     struct dwarf_subprogram_t *subprograms = NULL;
     int fd;
     unsigned int cksum = 0;
-    
+
     struct dwarf_subprogram_t *subprogram;
-    
+
     fd = open(filename, O_RDONLY);
     if (fd < 0) {
         warning("unable to open cache for reading at %s: %s",
                 filename, strerror(errno));
         goto error;
     }
-    
+
     ret = _read(fd, &cache_header, sizeof(cache_header));
     if (ret < 0) {
         warning("unable to read data from cache: %s", strerror(errno));
         goto error;
     }
-    
+
     if (cache_header.magic != SUBPROGRAMS_CACHE_MAGIC) {
         warning("Wrong file magic: expected %x, read %x",
                 SUBPROGRAMS_CACHE_MAGIC, cache_header.magic);
         goto error;
     }
-    
+
     if (cache_header.version != SUBPROGRAMS_CACHE_VERSION) {
         warning("Unable to handle cache version %d", cache_header.version);
         goto error;
     }
-    
+
     for (i = 0; i < cache_header.n_entries; i++) {
         ret = _read(fd, &cache_entry, sizeof(cache_entry));
         if (ret < 0) {
@@ -469,12 +482,12 @@ static struct dwarf_subprogram_t *load_subprograms(const char *filename)
             goto error;
         }
         cksum = checksum(cksum, (unsigned char *)&cache_entry, sizeof(cache_entry));
-        
+
         subprogram = malloc(sizeof(*subprogram));
         if (!subprogram)
             fatal("unable to allocate memory");
         memset(subprogram, 0, sizeof(*subprogram));
-        
+
         subprogram->lowpc = cache_entry.lowpc;
         subprogram->highpc = cache_entry.highpc;
         subprogram->name = malloc(sizeof(char)*cache_entry.namelen);
@@ -484,25 +497,25 @@ static struct dwarf_subprogram_t *load_subprograms(const char *filename)
             goto error;
         }
         cksum = checksum(cksum, (unsigned char *)subprogram->name, cache_entry.namelen);
-        
+
         subprogram->next = subprograms;
         subprograms = subprogram;
     }
-    
+
     close(fd);
-    
+
     if (cache_header.cksum != cksum) {
         warning("Invalid checksum: expected %x, read %x",
                 cache_header.cksum, cksum);
         goto error;
     }
-    
+
     return subprograms;
-    
+
 error:
     if (fd > 0)
         close(fd);
-    
+
     warning("can't read cache from %s", filename);
     return NULL;
 }
@@ -516,15 +529,15 @@ static void save_subprograms(const char *filename, struct dwarf_subprogram_t *su
         .magic = SUBPROGRAMS_CACHE_MAGIC,
         .version = SUBPROGRAMS_CACHE_VERSION,
     };
-    
+
     struct atosl_cache_entry_t cache_entry;
     int fd;
-    
+
     /* We want to put the tempfile in the same directory as the final file so we
      * can assure an atomic rename.
      */
     char *tempfile =
-    malloc(strlen(filename) + strlen(".") + strlen(".XXXXXX") + 1);
+        malloc(strlen(filename) + strlen(".") + strlen(".XXXXXX") + 1);
     char *pathbits = strdup(filename);
     char *dname = dirname(pathbits);
     /* dirname inserts a \0 where the final / was, so skip over the dname to get
@@ -532,54 +545,54 @@ static void save_subprograms(const char *filename, struct dwarf_subprogram_t *su
      */
     char *basename = dname + strlen(dname) + 1;
     sprintf(tempfile, "%s/.%s.XXXXXX", dname, basename);
-    
+
     fd = mkstemp(tempfile);
     if (fd < 0)
         fatal("unable to open cache for writing at %s: %s",
               tempfile, strerror(errno));
-    
+
     offset = lseek(fd, sizeof(cache_header), SEEK_SET);
     if (offset < 0)
         fatal("unable to seek in cache: %s", strerror(errno));
-    
+
     struct dwarf_subprogram_t *subprogram = subprograms;
-    
+
     while (subprogram) {
         cache_entry.lowpc = subprogram->lowpc;
         cache_entry.highpc = subprogram->highpc;
         cache_entry.namelen = strlen(subprogram->name)+1;
-        
+
         cksum = checksum(cksum, (unsigned char *)&cache_entry, sizeof(cache_entry));
         ret = _write(fd, &cache_entry, sizeof(cache_entry));
         if (ret < 0)
             fatal("unable to write data to cache: %s", strerror(errno));
         cksum = checksum(cksum, (unsigned char *)subprogram->name, cache_entry.namelen);
-        
+
         ret = _write(fd, subprogram->name, cache_entry.namelen);
         if (ret < 0)
             fatal("unable to write data to cache: %s", strerror(errno));
-        
+
         cache_header.n_entries++;
         subprogram = subprogram->next;
     }
-    
+
     cache_header.cksum = cksum;
-    
+
     offset = lseek(fd, 0, SEEK_SET);
     if (offset < 0)
         fatal("unable to seek in cache: %s", strerror(errno));
-    
+
     ret = _write(fd, &cache_header, sizeof(cache_header));
     if (ret < 0)
         fatal("unable to write data to cache: %s", strerror(errno));
-    
+
     close(fd);
-    
+
     ret = rename(tempfile, filename);
     if (ret < 0)
         fatal("Unable to rename cache from %s to %s: %s",
               tempfile, filename, strerror(errno));
-    
+
     free(tempfile);
     free(pathbits);
 }
@@ -591,14 +604,14 @@ struct dwarf_subprogram_t *subprograms_load(Dwarf_Debug dbg,
 {
     struct dwarf_subprogram_t *subprograms = NULL;
     char *filename = NULL;
-    
+
     if (options->persistent) {
         filename = get_cache_filename(options, uuid);
-        
+
         if (access(filename, R_OK) == 0)
             subprograms = load_subprograms(filename);
     }
-    
+
     if (!subprograms) {
         switch (type) {
             case SUBPROGRAMS_GLOBALS:
@@ -610,14 +623,14 @@ struct dwarf_subprogram_t *subprograms_load(Dwarf_Debug dbg,
             default:
                 fatal("unknown cache type %d", type);
         }
-        
+
         if (options->persistent)
             save_subprograms(filename, subprograms);
     }
-    
+
     if (filename)
         free(filename);
-    
+
     return subprograms;
 }
 
